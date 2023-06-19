@@ -1,0 +1,27 @@
+# permissions for end users to view clusterissuers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: clusterissuer-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: jubilant-controller
+    app.kubernetes.io/part-of: jubilant-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: clusterissuer-viewer-role
+rules:
+- apiGroups:
+  - jubilant.trustauth.net
+  resources:
+  - clusterissuers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - jubilant.trustauth.net
+  resources:
+  - clusterissuers/status
+  verbs:
+  - get
