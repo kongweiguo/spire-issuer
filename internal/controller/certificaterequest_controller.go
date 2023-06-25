@@ -34,9 +34,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	sampleissuerapi "github.com/cert-manager/sample-external-issuer/api/v1alpha1"
-	"github.com/cert-manager/sample-external-issuer/internal/issuer/signer"
-	issuerutil "github.com/cert-manager/sample-external-issuer/internal/issuer/util"
+	v1aplha1 "github.com/kongweiguo/jubilant-controller/api/v1alpha1"
+	issuerutil "github.com/kongweiguo/jubilant-controller/internal/util"
 )
 
 var (
@@ -78,7 +77,7 @@ func (r *CertificateRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	// Ignore CertificateRequest if issuerRef doesn't match our group
-	if certificateRequest.Spec.IssuerRef.Group != sampleissuerapi.GroupVersion.Group {
+	if certificateRequest.Spec.IssuerRef.Group != v1aplha1.GroupVersion.Group {
 		log.Info("Foreign group. Ignoring.", "group", certificateRequest.Spec.IssuerRef.Group)
 		return ctrl.Result{}, nil
 	}
@@ -136,7 +135,7 @@ func (r *CertificateRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 		r.recorder.Event(
 			&certificateRequest,
 			eventType,
-			sampleissuerapi.EventReasonCertificateRequestReconciler,
+			v1aplha1.EventReasonCertificateRequestReconciler,
 			message,
 		)
 		cmutil.SetCertificateRequestCondition(
@@ -181,7 +180,7 @@ func (r *CertificateRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	// Ignore but log an error if the issuerRef.Kind is unrecognised
-	issuerGVK := sampleissuerapi.GroupVersion.WithKind(certificateRequest.Spec.IssuerRef.Kind)
+	issuerGVK := v1aplha1.GroupVersion.WithKind(certificateRequest.Spec.IssuerRef.Kind)
 	issuerRO, err := r.Scheme.New(issuerGVK)
 	if err != nil {
 		report(cmapi.CertificateRequestReasonFailed, "Unrecognised kind. Ignoring", fmt.Errorf("%w: %v", errIssuerRef, err))
@@ -194,11 +193,11 @@ func (r *CertificateRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 	var secretNamespace string
 	switch t := issuer.(type) {
-	case *sampleissuerapi.Issuer:
+	case *v1aplha1.Issuer:
 		issuerName.Namespace = certificateRequest.Namespace
 		secretNamespace = certificateRequest.Namespace
 		log = log.WithValues("issuer", issuerName)
-	case *sampleissuerapi.ClusterIssuer:
+	case *v1aplha1.ClusterIssuer:
 		secretNamespace = r.ClusterResourceNamespace
 		log = log.WithValues("clusterissuer", issuerName)
 	default:
@@ -247,7 +246,7 @@ func (r *CertificateRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 }
 
 func (r *CertificateRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.recorder = mgr.GetEventRecorderFor(sampleissuerapi.EventSource)
+	r.recorder = mgr.GetEventRecorderFor(v1aplha1.EventSource)
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&cmapi.CertificateRequest{}).
 		Complete(r)

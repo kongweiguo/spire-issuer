@@ -26,13 +26,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+
 	"k8s.io/client-go/tools/record"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	sampleissuerapi "github.com/cert-manager/sample-external-issuer/api/v1alpha1"
-	"github.com/cert-manager/sample-external-issuer/internal/issuer/signer"
-	issuerutil "github.com/cert-manager/sample-external-issuer/internal/issuer/util"
+	"github.com/kongweiguo/jubilant-controller/api/v1alpha1"
+	"github.com/kongweiguo/jubilant-controller/internal/signer"
+	issuerutil "github.com/kongweiguo/jubilant-controller/internal/util"
 )
 
 const (
@@ -61,7 +63,7 @@ type IssuerReconciler struct {
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 func (r *IssuerReconciler) newIssuer() (client.Object, error) {
-	issuerGVK := sampleissuerapi.GroupVersion.WithKind(r.Kind)
+	issuerGVK := v1alpha1.GroupVersion.WithKind(r.Kind)
 	ro, err := r.Scheme.New(issuerGVK)
 	if err != nil {
 		return nil, err
@@ -93,7 +95,7 @@ func (r *IssuerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 
 	// report gives feedback by updating the Ready Condition of the {Cluster}Issuer
 	// For added visibility we also log a message and create a Kubernetes Event.
-	report := func(conditionStatus sampleissuerapi.ConditionStatus, message string, err error) {
+	report := func(conditionStatus v1alpha1.ConditionStatus, message string, err error) {
 		eventType := corev1.EventTypeNormal
 		if err != nil {
 			log.Error(err, message)
@@ -105,16 +107,16 @@ func (r *IssuerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		r.recorder.Event(
 			issuer,
 			eventType,
-			sampleissuerapi.EventReasonIssuerReconciler,
+			v1alpha1.EventReasonIssuerReconciler,
 			message,
 		)
-		issuerutil.SetReadyCondition(issuerStatus, conditionStatus, sampleissuerapi.EventReasonIssuerReconciler, message)
+		issuerutil.SetReadyCondition(issuerStatus, conditionStatus, v1alpha1.EventReasonIssuerReconciler, message)
 	}
 
 	// Always attempt to update the Ready condition
 	defer func() {
 		if err != nil {
-			report(sampleissuerapi.ConditionFalse, "Temporary error. Retrying", err)
+			report(v1alpha1.ConditionFalse, "Temporary error. Retrying", err)
 		}
 		if updateErr := r.Status().Update(ctx, issuer); updateErr != nil {
 			err = utilerrors.NewAggregate([]error{err, updateErr})
@@ -123,7 +125,7 @@ func (r *IssuerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 	}()
 
 	if ready := issuerutil.GetReadyCondition(issuerStatus); ready == nil {
-		report(sampleissuerapi.ConditionUnknown, "First seen", nil)
+		report(v1alpha1.ConditionUnknown, "First seen", nil)
 		return ctrl.Result{}, nil
 	}
 
@@ -132,9 +134,9 @@ func (r *IssuerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 	}
 
 	switch issuer.(type) {
-	case *sampleissuerapi.Issuer:
+	case *v1alpha1.Issuer:
 		secretName.Namespace = req.Namespace
-	case *sampleissuerapi.ClusterIssuer:
+	case *v1alpha1.ClusterIssuer:
 		secretName.Namespace = r.ClusterResourceNamespace
 	default:
 		log.Error(fmt.Errorf("unexpected issuer type: %t", issuer), "Not retrying.")
@@ -155,7 +157,7 @@ func (r *IssuerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		return ctrl.Result{}, fmt.Errorf("%w: %v", errHealthCheckerCheck, err)
 	}
 
-	report(sampleissuerapi.ConditionTrue, "Success", nil)
+	report(v1alpha1.ConditionTrue, "Success", nil)
 	return ctrl.Result{RequeueAfter: defaultHealthCheckInterval}, nil
 }
 
@@ -164,7 +166,7 @@ func (r *IssuerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if err != nil {
 		return err
 	}
-	r.recorder = mgr.GetEventRecorderFor(sampleissuerapi.EventSource)
+	r.recorder = mgr.GetEventRecorderFor(v1alpha1.EventSource)
 	return ctrl.NewControllerManagedBy(mgr).
 		For(issuerType).
 		Complete(r)
