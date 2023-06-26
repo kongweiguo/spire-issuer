@@ -10,3 +10,6 @@ metadata:
   name: issuer-sample
 spec:
   # TODO(user): Add fields here
+  workMode: "downstream"
+  spireAgentSocket: "unix:///tmp/spire-agent/public/api.sock"
+  spireAddress: "127.0.0.1:8081"

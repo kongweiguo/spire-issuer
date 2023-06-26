@@ -28,9 +28,9 @@ type IssuerSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	WorkMode        WorkMode `json:"work_mode"`
-	AgentSocketPath string   `json:"agent_socket_path"` // uds
-	SpireAddress    string   `json:"spire_address"`     // “address:port”
+	WorkMode           WorkMode `json:"workMode"`
+	SpireAgentSocket   string   `json:"spireAgentSocket"` // spire agent's unix domain socket path
+	SpireServerAddress string   `json:"spireAddress"`     // spire server listen address, looks like: “address:port”
 }
 
 type WorkMode string
@@ -53,6 +53,9 @@ type IssuerStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	Conditions []IssuerCondition `json:"conditions,omitempty"`
+
+	// Byte slice containing a PEM encoded signed certificate of the CA
+	Certificate []byte `json:"certificate,omitempty"`
 }
 
 //+kubebuilder:object:root=true

@@ -26,7 +26,6 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"k8s.io/utils/clock"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -38,6 +37,7 @@ import (
 	cmapi "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	jubilantv1alpha1 "github.com/kongweiguo/jubilant-controller/api/v1alpha1"
 	controllers "github.com/kongweiguo/jubilant-controller/internal/controller"
+	"github.com/kongweiguo/jubilant-controller/internal/signer"
 	"github.com/prometheus/common/version"
 	//+kubebuilder:scaffold:imports
 )
@@ -69,7 +69,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&clusterResourceNamespace, "cluster-resource-namespace", "", "The namespace for secrets in which cluster-scoped resources are found.")
+	flag.StringVar(&clusterResourceNamespace, "cluster-resource-namespace", "default", "The namespace for secrets in which cluster-scoped resources are found.")
 	flag.BoolVar(&printVersion, "version", false, "Print version to stdout and exit")
 	flag.BoolVar(&disableApprovedCheck, "disable-approved-check", false,
 		"Disables waiting for CertificateRequests to have an approved condition before signing.")
@@ -132,7 +132,7 @@ func main() {
 		Client:                   mgr.GetClient(),
 		Scheme:                   mgr.GetScheme(),
 		ClusterResourceNamespace: clusterResourceNamespace,
-		HealthCheckerBuilder:     signer.ExampleHealthCheckerFromIssuerAndSecretData,
+		SignerBuilder:            signer.BuildSigner,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Issuer")
 		os.Exit(1)
@@ -142,23 +142,22 @@ func main() {
 		Client:                   mgr.GetClient(),
 		Scheme:                   mgr.GetScheme(),
 		ClusterResourceNamespace: clusterResourceNamespace,
-		HealthCheckerBuilder:     signer.ExampleHealthCheckerFromIssuerAndSecretData,
+		SignerBuilder:            signer.BuildSigner,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterIssuer")
 		os.Exit(1)
 	}
 
-	if err = (&controllers.CertificateRequestReconciler{
-		Client:                   mgr.GetClient(),
-		Scheme:                   mgr.GetScheme(),
-		ClusterResourceNamespace: clusterResourceNamespace,
-		SignerBuilder:            signer.ExampleSignerFromIssuerAndSecretData,
-		CheckApprovedCondition:   !disableApprovedCheck,
-		Clock:                    clock.RealClock{},
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "CertificateRequest")
-		os.Exit(1)
-	}
+	// if err = (&controllers.CertificateRequestReconciler{
+	// 	Client:                   mgr.GetClient(),
+	// 	Scheme:                   mgr.GetScheme(),
+	// 	ClusterResourceNamespace: clusterResourceNamespace,
+	// 	CheckApprovedCondition:   !disableApprovedCheck,
+	// 	Clock:                    clock.RealClock{},
+	// }).SetupWithManager(mgr); err != nil {
+	// 	setupLog.Error(err, "unable to create controller", "controller", "CertificateRequest")
+	// 	os.Exit(1)
+	// }
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

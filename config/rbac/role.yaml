@@ -6,52 +6,33 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - jubilant.trustauth.net
+  - ""
   resources:
-  - clusterissuers
+  - events
   verbs:
   - create
-  - delete
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - jubilant.trustauth.net
   resources:
-  - clusterissuers/finalizers
+  - clusterissuers
+  - issuers
   verbs:
-  - update
+  - get
+  - list
+  - watch
 - apiGroups:
   - jubilant.trustauth.net
   resources:
   - clusterissuers/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - jubilant.trustauth.net
-  resources:
-  - issuers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - jubilant.trustauth.net
-  resources:
-  - issuers/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - jubilant.trustauth.net
-  resources:
   - issuers/status
   verbs:
   - get

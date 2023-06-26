@@ -18,34 +18,39 @@ package controllers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	"k8s.io/client-go/tools/record"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudflare/cfssl/log"
+	"github.com/go-logr/logr"
 	"github.com/kongweiguo/jubilant-controller/api/v1alpha1"
 	"github.com/kongweiguo/jubilant-controller/internal/signer"
-	issuerutil "github.com/kongweiguo/jubilant-controller/internal/util"
+	"github.com/kongweiguo/jubilant-controller/internal/utils"
 )
 
 const (
 	defaultHealthCheckInterval = time.Minute
 )
 
-var (
-	errGetAuthSecret        = errors.New("failed to get Secret containing Issuer credentials")
-	errHealthCheckerBuilder = errors.New("failed to build the healthchecker")
-	errHealthCheckerCheck   = errors.New("healthcheck failed")
-)
+type issuerContext struct {
+	ctx context.Context
+	req ctrl.Request
+
+	issuer       client.Object
+	issuerSpec   *v1alpha1.IssuerSpec
+	issuerStatus *v1alpha1.IssuerStatus
+
+	log logr.Logger
+}
 
 // IssuerReconciler reconciles a Issuer object
 type IssuerReconciler struct {
@@ -53,12 +58,25 @@ type IssuerReconciler struct {
 	Kind                     string
 	Scheme                   *runtime.Scheme
 	ClusterResourceNamespace string
-	HealthCheckerBuilder     signer.HealthCheckerBuilder
+	SignerBuilder            signer.SignerBuilder
 	recorder                 record.EventRecorder
+
+	Logger logr.Logger
 }
 
-// +kubebuilder:rbac:groups=sample-issuer.example.com,resources=issuers;clusterissuers,verbs=get;list;watch
-// +kubebuilder:rbac:groups=sample-issuer.example.com,resources=issuers/status;clusterissuers/status,verbs=get;update;patch
+func (r *IssuerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	issuerType, err := r.newIssuer()
+	if err != nil {
+		return err
+	}
+	r.recorder = mgr.GetEventRecorderFor(v1alpha1.EventSource)
+	return ctrl.NewControllerManagedBy(mgr).
+		For(issuerType).
+		Complete(r)
+}
+
+// +kubebuilder:rbac:groups=jubilant.trustauth.net,resources=issuers;clusterissuers,verbs=get;list;watch
+// +kubebuilder:rbac:groups=jubilant.trustauth.net,resources=issuers/status;clusterissuers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
@@ -73,6 +91,7 @@ func (r *IssuerReconciler) newIssuer() (client.Object, error) {
 
 func (r *IssuerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
 	log := ctrl.LoggerFrom(ctx)
+	r.Logger = log
 
 	issuer, err := r.newIssuer()
 	if err != nil {
@@ -87,87 +106,106 @@ func (r *IssuerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		return ctrl.Result{}, nil
 	}
 
-	issuerSpec, issuerStatus, err := issuerutil.GetSpecAndStatus(issuer)
+	issuerSpec, issuerStatus, err := utils.GetSpecAndStatus(issuer)
 	if err != nil {
 		log.Error(err, "Unexpected error while getting issuer spec and status. Not retrying.")
 		return ctrl.Result{}, nil
 	}
 
-	// report gives feedback by updating the Ready Condition of the {Cluster}Issuer
-	// For added visibility we also log a message and create a Kubernetes Event.
-	report := func(conditionStatus v1alpha1.ConditionStatus, message string, err error) {
-		eventType := corev1.EventTypeNormal
-		if err != nil {
-			log.Error(err, message)
-			eventType = corev1.EventTypeWarning
-			message = fmt.Sprintf("%s: %v", message, err)
-		} else {
-			log.Info(message)
-		}
-		r.recorder.Event(
-			issuer,
-			eventType,
-			v1alpha1.EventReasonIssuerReconciler,
-			message,
-		)
-		issuerutil.SetReadyCondition(issuerStatus, conditionStatus, v1alpha1.EventReasonIssuerReconciler, message)
+	ictx := issuerContext{
+		ctx: ctx,
+		req: req,
+
+		issuer:       issuer,
+		issuerSpec:   issuerSpec,
+		issuerStatus: issuerStatus,
+
+		log: log,
 	}
 
 	// Always attempt to update the Ready condition
-	defer func() {
-		if err != nil {
-			report(v1alpha1.ConditionFalse, "Temporary error. Retrying", err)
-		}
-		if updateErr := r.Status().Update(ctx, issuer); updateErr != nil {
-			err = utilerrors.NewAggregate([]error{err, updateErr})
-			result = ctrl.Result{}
-		}
-	}()
+	defer r.applyStatus(&ictx)
 
-	if ready := issuerutil.GetReadyCondition(issuerStatus); ready == nil {
-		report(v1alpha1.ConditionUnknown, "First seen", nil)
+	if ready := utils.GetReadyCondition(issuerStatus); ready == nil {
+		r.reportStatus(&ictx, v1alpha1.ConditionUnknown, "First seen", nil)
 		return ctrl.Result{}, nil
 	}
 
-	secretName := types.NamespacedName{
-		Name: issuerSpec.AuthSecretName,
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
 
-	switch issuer.(type) {
-	case *v1alpha1.Issuer:
-		secretName.Namespace = req.Namespace
-	case *v1alpha1.ClusterIssuer:
-		secretName.Namespace = r.ClusterResourceNamespace
-	default:
-		log.Error(fmt.Errorf("unexpected issuer type: %t", issuer), "Not retrying.")
-		return ctrl.Result{}, nil
-	}
-
-	var secret corev1.Secret
-	if err := r.Get(ctx, secretName, &secret); err != nil {
-		return ctrl.Result{}, fmt.Errorf("%w, secret name: %s, reason: %v", errGetAuthSecret, secretName, err)
-	}
-
-	checker, err := r.HealthCheckerBuilder(issuerSpec, secret.Data)
+	rawCertChain, err := r.SignerBuilder(ctx, req.NamespacedName, issuerSpec)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("%w: %v", errHealthCheckerBuilder, err)
+		r.reportStatus(&ictx, v1alpha1.ConditionFalse, "SignerBuilder fail", err)
+		return ctrl.Result{RequeueAfter: time.Minute * 2}, nil
 	}
 
-	if err := checker.Check(); err != nil {
-		return ctrl.Result{}, fmt.Errorf("%w: %v", errHealthCheckerCheck, err)
+	rawCertChainPEM := ""
+	for _, c := range rawCertChain {
+		rawCertChainPEM += fmt.Sprintf("%s\n", utils.X509DERToPEM(c))
 	}
+	issuerStatus.Certificate = []byte(rawCertChainPEM)
 
-	report(v1alpha1.ConditionTrue, "Success", nil)
+	r.reportStatus(&ictx, v1alpha1.ConditionTrue, "Success", nil)
 	return ctrl.Result{RequeueAfter: defaultHealthCheckInterval}, nil
 }
 
-func (r *IssuerReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	issuerType, err := r.newIssuer()
+// report gives feedback by updating the Ready Condition of the {Cluster}Issuer
+// For added visibility we also log a message and create a Kubernetes Event.
+func (r *IssuerReconciler) reportStatus(ictx *issuerContext, conditionStatus v1alpha1.ConditionStatus, message string, err error) {
+	eventType := corev1.EventTypeNormal
 	if err != nil {
-		return err
+		log.Error(err, message)
+		eventType = corev1.EventTypeWarning
+		message = fmt.Sprintf("%s: %v", message, err)
+	} else {
+		log.Info(message)
 	}
-	r.recorder = mgr.GetEventRecorderFor(v1alpha1.EventSource)
-	return ctrl.NewControllerManagedBy(mgr).
-		For(issuerType).
-		Complete(r)
+
+	r.recorder.Event(
+		ictx.issuer,
+		eventType,
+		v1alpha1.EventReasonIssuerReconciler,
+		message,
+	)
+	utils.SetReadyCondition(ictx.issuerStatus, conditionStatus, v1alpha1.EventReasonIssuerReconciler, message)
+}
+
+func (r *IssuerReconciler) applyStatus(ictx *issuerContext) {
+	issuerInSystem, err := r.newIssuer()
+	if err != nil {
+		r.Logger.Error(err, "Unrecognised issuer type")
+		return
+	}
+	if err := r.Get(ictx.ctx, ictx.req.NamespacedName, issuerInSystem); err != nil {
+		if err := client.IgnoreNotFound(err); err != nil {
+			r.Logger.Error(err, "unexpected get error")
+		}
+		r.Logger.Info("Not found. Ignoring.")
+		return
+	}
+
+	_, issuerStatusInSystem, err := utils.GetSpecAndStatus(issuerInSystem)
+	if err != nil {
+		r.Logger.Error(err, "Unexpected error while getting issuer spec and status. Not retrying.")
+		return
+	}
+
+	if !utils.DeepEqual(ictx.issuerStatus, issuerStatusInSystem, true) {
+		metaAccessor := meta.NewAccessor()
+		currentResourceVersion, err := metaAccessor.ResourceVersion(issuerInSystem)
+		if err != nil {
+			r.Logger.Error(err, "failed to metaAccessor")
+			return
+		}
+
+		_ = metaAccessor.SetResourceVersion(ictx.issuer, currentResourceVersion)
+		err = r.Client.Status().Update(ictx.ctx, ictx.issuer)
+		if err != nil {
+			r.Logger.Error(err, "failed to update status")
+			return
+		}
+
+		r.Logger.Info("Update CisCluster status successfully")
+	}
 }

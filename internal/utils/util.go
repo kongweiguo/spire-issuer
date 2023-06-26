@@ -14,33 +14,36 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package utils
 
 import (
+	"encoding/pem"
 	"fmt"
+	"reflect"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/kongweiguo/jubilant-controller/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	sampleissuerapi "github.com/cert-manager/sample-external-issuer/api/v1alpha1"
 )
 
-func GetSpecAndStatus(issuer client.Object) (*sampleissuerapi.IssuerSpec, *sampleissuerapi.IssuerStatus, error) {
+func GetSpecAndStatus(issuer client.Object) (*v1alpha1.IssuerSpec, *v1alpha1.IssuerStatus, error) {
 	switch t := issuer.(type) {
-	case *sampleissuerapi.Issuer:
+	case *v1alpha1.Issuer:
 		return &t.Spec, &t.Status, nil
-	case *sampleissuerapi.ClusterIssuer:
+	case *v1alpha1.ClusterIssuer:
 		return &t.Spec, &t.Status, nil
 	default:
 		return nil, nil, fmt.Errorf("not an issuer type: %t", t)
 	}
 }
 
-func SetReadyCondition(status *sampleissuerapi.IssuerStatus, conditionStatus sampleissuerapi.ConditionStatus, reason, message string) {
+func SetReadyCondition(status *v1alpha1.IssuerStatus, conditionStatus v1alpha1.ConditionStatus, reason, message string) {
 	ready := GetReadyCondition(status)
 	if ready == nil {
-		ready = &sampleissuerapi.IssuerCondition{
-			Type: sampleissuerapi.IssuerConditionReady,
+		ready = &v1alpha1.IssuerCondition{
+			Type: v1alpha1.IssuerConditionReady,
 		}
 		status.Conditions = append(status.Conditions, *ready)
 	}
@@ -53,25 +56,44 @@ func SetReadyCondition(status *sampleissuerapi.IssuerStatus, conditionStatus sam
 	ready.Message = message
 
 	for i, c := range status.Conditions {
-		if c.Type == sampleissuerapi.IssuerConditionReady {
+		if c.Type == v1alpha1.IssuerConditionReady {
 			status.Conditions[i] = *ready
 			return
 		}
 	}
 }
 
-func GetReadyCondition(status *sampleissuerapi.IssuerStatus) *sampleissuerapi.IssuerCondition {
+func GetReadyCondition(status *v1alpha1.IssuerStatus) *v1alpha1.IssuerCondition {
 	for _, c := range status.Conditions {
-		if c.Type == sampleissuerapi.IssuerConditionReady {
+		if c.Type == v1alpha1.IssuerConditionReady {
 			return &c
 		}
 	}
 	return nil
 }
 
-func IsReady(status *sampleissuerapi.IssuerStatus) bool {
+func IsReady(status *v1alpha1.IssuerStatus) bool {
 	if c := GetReadyCondition(status); c != nil {
-		return c.Status == sampleissuerapi.ConditionTrue
+		return c.Status == v1alpha1.ConditionTrue
 	}
 	return false
+}
+
+func X509DERToPEM(der []byte) []byte {
+	x509PEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: der,
+	})
+
+	return x509PEM
+}
+
+// DeepEqual ...
+func DeepEqual(x, y interface{}, isEquateEmpty bool) bool {
+	if isEquateEmpty {
+		opts := []cmp.Option{cmpopts.EquateEmpty(), cmpopts.IgnoreUnexported()}
+		return cmp.Equal(x, y, opts...)
+	}
+
+	return reflect.DeepEqual(x, y)
 }
