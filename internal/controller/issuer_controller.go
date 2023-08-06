@@ -22,24 +22,36 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/client-go/tools/record"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudflare/cfssl/log"
 	"github.com/go-logr/logr"
 	"github.com/kongweiguo/jubilant-controller/api/v1alpha1"
-	"github.com/kongweiguo/jubilant-controller/internal/signer"
+	"github.com/kongweiguo/jubilant-controller/internal/authority"
 	"github.com/kongweiguo/jubilant-controller/internal/utils"
 )
 
 const (
 	defaultHealthCheckInterval = time.Minute
 )
+
+// IssuerReconciler reconciles a Issuer object
+type IssuerReconciler struct {
+	Logger logr.Logger
+
+	Client                   client.Client
+	Kind                     string
+	Scheme                   *runtime.Scheme
+	ClusterResourceNamespace string
+	recorder                 record.EventRecorder
+}
 
 type issuerContext struct {
 	ctx context.Context
@@ -48,20 +60,6 @@ type issuerContext struct {
 	issuer       client.Object
 	issuerSpec   *v1alpha1.IssuerSpec
 	issuerStatus *v1alpha1.IssuerStatus
-
-	log logr.Logger
-}
-
-// IssuerReconciler reconciles a Issuer object
-type IssuerReconciler struct {
-	client.Client
-	Kind                     string
-	Scheme                   *runtime.Scheme
-	ClusterResourceNamespace string
-	SignerBuilder            signer.SignerBuilder
-	recorder                 record.EventRecorder
-
-	Logger logr.Logger
 }
 
 func (r *IssuerReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -98,7 +96,7 @@ func (r *IssuerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		log.Error(err, "Unrecognised issuer type")
 		return ctrl.Result{}, nil
 	}
-	if err := r.Get(ctx, req.NamespacedName, issuer); err != nil {
+	if err := r.Client.Get(ctx, req.NamespacedName, issuer); err != nil {
 		if err := client.IgnoreNotFound(err); err != nil {
 			return ctrl.Result{}, fmt.Errorf("unexpected get error: %v", err)
 		}
@@ -112,72 +110,131 @@ func (r *IssuerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		return ctrl.Result{}, nil
 	}
 
-	ictx := issuerContext{
+	iCtx := &issuerContext{
 		ctx: ctx,
 		req: req,
 
 		issuer:       issuer,
 		issuerSpec:   issuerSpec,
 		issuerStatus: issuerStatus,
-
-		log: log,
 	}
 
 	// Always attempt to update the Ready condition
-	defer r.applyStatus(&ictx)
+	defer r.updateStatus(iCtx)
 
-	if ready := utils.GetReadyCondition(issuerStatus); ready == nil {
-		r.reportStatus(&ictx, v1alpha1.ConditionUnknown, "First seen", nil)
-		return ctrl.Result{}, nil
-	}
+	// ready := utils.GetReadyCondition(issuerStatus)
+	// if ready == nil {
+	// 	r.setStatusAndEvent(&iCtx, v1alpha1.ConditionUnknown, "First seen", nil)
+	// 	return ctrl.Result{}, nil
+	// }
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	rawCertChain, err := r.SignerBuilder(ctx, req.NamespacedName, issuerSpec)
+	result, err = r.reconcileAuthority(iCtx)
 	if err != nil {
-		r.reportStatus(&ictx, v1alpha1.ConditionFalse, "SignerBuilder fail", err)
+		utils.SetReadyCondition(issuerStatus, v1alpha1.ConditionFalse, v1alpha1.EventReasonIssuerReconciler, fmt.Sprintf("reconcileAuthority failed, error:%s", err))
+		r.recorder.Event(issuer, corev1.EventTypeWarning, v1alpha1.EventReasonIssuerReconciler, err.Error())
+		r.Logger.Error(err, "reconcileAuthority failed")
 		return ctrl.Result{RequeueAfter: time.Minute * 2}, nil
 	}
 
-	rawCertChainPEM := ""
-	for _, c := range rawCertChain {
-		rawCertChainPEM += fmt.Sprintf("%s\n", utils.X509DERToPEM(c))
-	}
-	issuerStatus.Certificate = []byte(rawCertChainPEM)
+	utils.SetReadyCondition(issuerStatus, v1alpha1.ConditionTrue, v1alpha1.EventReasonIssuerReconciler, "Success")
+	r.recorder.Event(issuer, corev1.EventTypeNormal, v1alpha1.EventReasonIssuerReconciler, "Success")
+	r.Logger.Info("Success")
 
-	r.reportStatus(&ictx, v1alpha1.ConditionTrue, "Success", nil)
 	return ctrl.Result{RequeueAfter: defaultHealthCheckInterval}, nil
 }
 
-// report gives feedback by updating the Ready Condition of the {Cluster}Issuer
-// For added visibility we also log a message and create a Kubernetes Event.
-func (r *IssuerReconciler) reportStatus(ictx *issuerContext, conditionStatus v1alpha1.ConditionStatus, message string, err error) {
-	eventType := corev1.EventTypeNormal
-	if err != nil {
-		log.Error(err, message)
-		eventType = corev1.EventTypeWarning
-		message = fmt.Sprintf("%s: %v", message, err)
-	} else {
-		log.Info(message)
+func (r *IssuerReconciler) reconcileAuthority(ictx *issuerContext) (ctrl.Result, error) {
+
+	secret := &corev1.Secret{}
+	secretName := types.NamespacedName{Namespace: ictx.req.Namespace, Name: ictx.issuerSpec.SecretName}
+	if len(secretName.Namespace) == 0 {
+		secretName.Namespace = r.ClusterResourceNamespace
 	}
 
-	r.recorder.Event(
-		ictx.issuer,
-		eventType,
-		v1alpha1.EventReasonIssuerReconciler,
-		message,
-	)
-	utils.SetReadyCondition(ictx.issuerStatus, conditionStatus, v1alpha1.EventReasonIssuerReconciler, message)
+	err := r.Client.Get(ictx.ctx, secretName, secret)
+	if err == nil {
+		// found
+		r.Logger.Info("found secret, trying to check TTL")
+
+		ca, err := authority.SecretToAuthority(secret)
+		if err != nil {
+			r.Logger.Error(err, "secret to authority failed")
+			return ctrl.Result{RequeueAfter: defaultHealthCheckInterval}, err
+		}
+
+		if !r.authorityNeedRotate(ictx, ca) {
+			return ctrl.Result{}, nil
+		}
+
+		ca, err = r.buildAuthority(ictx)
+		if err != nil {
+			r.Logger.Error(err, "build authority failed")
+			return ctrl.Result{RequeueAfter: defaultHealthCheckInterval}, err
+		}
+		secret = authority.AuthorityToSecret(&secretName, ca)
+
+		err = r.Client.Update(ictx.ctx, secret)
+		if err != nil {
+			r.Logger.Error(err, "build authority failed")
+			return ctrl.Result{RequeueAfter: defaultHealthCheckInterval}, err
+		}
+
+		return ctrl.Result{}, nil
+	} else if apierrors.IsNotFound(err) {
+		// not found
+		r.Logger.Info("not found secret")
+
+		ca, err := r.buildAuthority(ictx)
+		if err != nil {
+			return ctrl.Result{RequeueAfter: defaultHealthCheckInterval}, err
+		}
+
+		secret = authority.AuthorityToSecret(&secretName, ca)
+		err = r.Client.Create(ictx.ctx, secret)
+		if err != nil {
+			r.Logger.Error(err, "create secret failed")
+			return ctrl.Result{}, fmt.Errorf("create secret failed. not retrying... error: %v", err)
+		}
+
+		r.Logger.Info("Create Secret Success")
+		return ctrl.Result{}, nil
+	} else {
+		r.Logger.Error(err, "unexpected Get Secret. not retrying...")
+		return ctrl.Result{}, fmt.Errorf("unexpected Get Secret. not retrying... error: %v", err)
+	}
 }
 
-func (r *IssuerReconciler) applyStatus(ictx *issuerContext) {
+func (r *IssuerReconciler) buildAuthority(ictx *issuerContext) (*authority.Authority, error) {
+	return nil, nil
+}
+
+func (r *IssuerReconciler) authorityNeedRotate(ictx *issuerContext, ca *authority.Authority) bool {
+
+	if ca == nil || len(ca.CertChain) < 1 {
+		return true
+	}
+
+	cert := ca.CertChain[0]
+	notBefore := cert.NotBefore
+	notAfter := cert.NotAfter
+	now := time.Now()
+
+	// less than 1/3 TTL
+	if now.After(notBefore.Add((notAfter.Sub(notBefore)) * 2 / 3)) {
+		return true
+	}
+
+	return false
+}
+
+func (r *IssuerReconciler) updateStatus(ictx *issuerContext) {
 	issuerInSystem, err := r.newIssuer()
 	if err != nil {
 		r.Logger.Error(err, "Unrecognised issuer type")
 		return
 	}
-	if err := r.Get(ictx.ctx, ictx.req.NamespacedName, issuerInSystem); err != nil {
+
+	if err := r.Client.Get(ictx.ctx, ictx.req.NamespacedName, issuerInSystem); err != nil {
 		if err := client.IgnoreNotFound(err); err != nil {
 			r.Logger.Error(err, "unexpected get error")
 		}

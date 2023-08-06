@@ -35,16 +35,19 @@ spec:
           spec:
             description: IssuerSpec defines the desired state of Issuer
             properties:
+              agentSocket:
+                type: string
+              secretName:
+                type: string
               spireAddress:
                 type: string
-              spireAgentSocket:
-                type: string
-              workMode:
+              trustDomain:
                 type: string
             required:
+            - agentSocket
+            - secretName
             - spireAddress
-            - spireAgentSocket
-            - workMode
+            - trustDomain
             type: object
           status:
             description: IssuerStatus defines the observed state of Issuer

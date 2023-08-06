@@ -17,7 +17,6 @@ limitations under the License.
 package utils
 
 import (
-	"encoding/pem"
 	"fmt"
 	"reflect"
 
@@ -77,15 +76,6 @@ func IsReady(status *v1alpha1.IssuerStatus) bool {
 		return c.Status == v1alpha1.ConditionTrue
 	}
 	return false
-}
-
-func X509DERToPEM(der []byte) []byte {
-	x509PEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: der,
-	})
-
-	return x509PEM
 }
 
 // DeepEqual ...

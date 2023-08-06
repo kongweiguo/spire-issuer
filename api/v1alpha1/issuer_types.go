@@ -28,23 +28,18 @@ type IssuerSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	WorkMode           WorkMode `json:"workMode"`
-	SpireAgentSocket   string   `json:"spireAgentSocket"` // spire agent's unix domain socket path
-	SpireServerAddress string   `json:"spireAddress"`     // spire server listen address, looks like: “address:port”
+	TrustDomain   string `json:"trustDomain"`  // trustdomain of the issuer,should be same with spire agent and spire server configuration
+	AgentSocket   string `json:"agentSocket"`  // spire agent's unix domain socket path
+	ServerAddress string `json:"spireAddress"` // spire server listen address, looks like: “address:port”
+	SecretName    string `json:"secretName"`
+	//WorkMode           WorkMode `json:"workMode"`         // issuer work mode, could be one ["downstream"|"mint"]
 }
 
 type WorkMode string
 
 const (
-	Downstream WorkMode = "downstream"
+	Downstream WorkMode = "downstream" //
 	Mint       WorkMode = "mint"
-)
-
-type KeyManager string
-
-const (
-	Memory KeyManager = "memory"
-	Secret KeyManager = "k8s-secret"
 )
 
 // IssuerStatus defines the observed state of Issuer
