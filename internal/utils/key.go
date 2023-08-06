@@ -50,3 +50,13 @@ func ParsePrivateKeyPEM(privateKeyPEM []byte) (key crypto.Signer, err error) {
 	err = errors.Errorf("not support block type:%v", block.Type)
 	return nil, err
 }
+
+// PRIVATE KEY
+func PKCS8PrivateKeyDERtoPEM(privateKeyDER []byte) (privateKeyPEM []byte) {
+	privateKeyPEM = pem.EncodeToMemory(&pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: privateKeyDER,
+	})
+
+	return
+}

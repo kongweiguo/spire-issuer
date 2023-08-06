@@ -24,13 +24,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	"k8s.io/client-go/tools/record"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/go-logr/logr"
 	"github.com/kongweiguo/jubilant-controller/api/v1alpha1"
@@ -42,6 +45,8 @@ const (
 	defaultHealthCheckInterval = time.Minute
 )
 
+type Reconciler func(ictx *issuerContext) (ctrl.Result, error)
+
 // IssuerReconciler reconciles a Issuer object
 type IssuerReconciler struct {
 	Logger logr.Logger
@@ -51,15 +56,19 @@ type IssuerReconciler struct {
 	Scheme                   *runtime.Scheme
 	ClusterResourceNamespace string
 	recorder                 record.EventRecorder
+
+	handlers map[v1alpha1.Phase][]Reconciler
 }
 
 type issuerContext struct {
+	Logger logr.Logger
+
 	ctx context.Context
 	req ctrl.Request
 
-	issuer       client.Object
-	issuerSpec   *v1alpha1.IssuerSpec
-	issuerStatus *v1alpha1.IssuerStatus
+	issuer client.Object
+	spec   *v1alpha1.IssuerSpec
+	status *v1alpha1.IssuerStatus
 }
 
 func (r *IssuerReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -67,6 +76,17 @@ func (r *IssuerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if err != nil {
 		return err
 	}
+
+	r.handlers = make(map[v1alpha1.Phase][]Reconciler)
+
+	r.handlers[v1alpha1.Processing] = []Reconciler{
+		r.reconcileAuthority,
+	}
+
+	r.handlers[v1alpha1.Running] = []Reconciler{
+		r.reconcileAuthority,
+	}
+
 	r.recorder = mgr.GetEventRecorderFor(v1alpha1.EventSource)
 	return ctrl.NewControllerManagedBy(mgr).
 		For(issuerType).
@@ -111,42 +131,72 @@ func (r *IssuerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 	}
 
 	iCtx := &issuerContext{
-		ctx: ctx,
-		req: req,
+		Logger: log,
+		ctx:    ctx,
+		req:    req,
 
-		issuer:       issuer,
-		issuerSpec:   issuerSpec,
-		issuerStatus: issuerStatus,
+		issuer: issuer,
+		spec:   issuerSpec,
+		status: issuerStatus,
 	}
 
-	// Always attempt to update the Ready condition
-	defer r.updateStatus(iCtx)
+	return r.reconcile(iCtx)
+}
 
-	// ready := utils.GetReadyCondition(issuerStatus)
-	// if ready == nil {
-	// 	r.setStatusAndEvent(&iCtx, v1alpha1.ConditionUnknown, "First seen", nil)
-	// 	return ctrl.Result{}, nil
-	// }
+func (r *IssuerReconciler) reconcile(iCtx *issuerContext) (ctrl.Result, error) {
+	// Flow:
+	// 1. 判断当前Phase下所有Procedure的Condition
+	// 2. 判定是否跃迁到下一个阶段
 
-	result, err = r.reconcileAuthority(iCtx)
-	if err != nil {
-		utils.SetReadyCondition(issuerStatus, v1alpha1.ConditionFalse, v1alpha1.EventReasonIssuerReconciler, fmt.Sprintf("reconcileAuthority failed, error:%s", err))
-		r.recorder.Event(issuer, corev1.EventTypeWarning, v1alpha1.EventReasonIssuerReconciler, err.Error())
-		r.Logger.Error(err, "reconcileAuthority failed")
-		return ctrl.Result{RequeueAfter: time.Minute * 2}, nil
+	if iCtx.status.Phase == "" {
+		iCtx.status.Phase = v1alpha1.Processing
 	}
 
-	utils.SetReadyCondition(issuerStatus, v1alpha1.ConditionTrue, v1alpha1.EventReasonIssuerReconciler, "Success")
-	r.recorder.Event(issuer, corev1.EventTypeNormal, v1alpha1.EventReasonIssuerReconciler, "Success")
-	r.Logger.Info("Success")
+	CurrentHandlers, ok := r.handlers[iCtx.status.Phase]
+	if !ok {
+		err := fmt.Errorf("not found phase(%s) procedures", iCtx.status.Phase)
+		r.Logger.Error(err, "fail to retrieve handlers")
+		return ctrl.Result{}, err
+	}
 
-	return ctrl.Result{RequeueAfter: defaultHealthCheckInterval}, nil
+	var result ctrl.Result
+	var errorList []error
+
+	for _, h := range CurrentHandlers {
+		procedureName := utils.GetFuncName(h)
+		currentResult, err := h(iCtx)
+		if err != nil {
+			r.Logger.Error(err, fmt.Sprintf("%s failed", procedureName))
+			errorList = append(errorList, err)
+		}
+		result = utils.LowestNonZeroResult(result, currentResult)
+	}
+
+	var ready = true
+	for _, h := range CurrentHandlers {
+		typ := utils.GetFuncName(h)
+		c, ok := utils.GetCondition(iCtx.status, typ)
+		if !ok || c.Status != metav1.ConditionTrue {
+			ready = false
+		}
+	}
+
+	switch iCtx.status.Phase {
+	case v1alpha1.Running, v1alpha1.Processing:
+		if ready {
+			iCtx.status.Phase = v1alpha1.Running
+		} else {
+			iCtx.status.Phase = v1alpha1.Processing
+		}
+	}
+
+	r.applyStatus(iCtx)
+	return result, utilerrors.NewAggregate(errorList)
 }
 
 func (r *IssuerReconciler) reconcileAuthority(ictx *issuerContext) (ctrl.Result, error) {
-
 	secret := &corev1.Secret{}
-	secretName := types.NamespacedName{Namespace: ictx.req.Namespace, Name: ictx.issuerSpec.SecretName}
+	secretName := types.NamespacedName{Namespace: ictx.req.Namespace, Name: ictx.req.Name}
 	if len(secretName.Namespace) == 0 {
 		secretName.Namespace = r.ClusterResourceNamespace
 	}
@@ -162,7 +212,7 @@ func (r *IssuerReconciler) reconcileAuthority(ictx *issuerContext) (ctrl.Result,
 			return ctrl.Result{RequeueAfter: defaultHealthCheckInterval}, err
 		}
 
-		if !r.authorityNeedRotate(ictx, ca) {
+		if !ca.NeedRotation() {
 			return ctrl.Result{}, nil
 		}
 
@@ -172,6 +222,18 @@ func (r *IssuerReconciler) reconcileAuthority(ictx *issuerContext) (ctrl.Result,
 			return ctrl.Result{RequeueAfter: defaultHealthCheckInterval}, err
 		}
 		secret = authority.AuthorityToSecret(&secretName, ca)
+
+		err = ctrl.SetControllerReference(ictx.issuer, secret, r.Scheme)
+		if err != nil {
+			r.Logger.Error(err, "couldn't set controller reference for secret")
+			return ctrl.Result{}, err
+		}
+
+		err = controllerutil.SetOwnerReference(ictx.issuer, secret, r.Scheme)
+		if err != nil {
+			r.Logger.Error(err, "couldn't set controller reference for secret")
+			return ctrl.Result{}, err
+		}
 
 		err = r.Client.Update(ictx.ctx, secret)
 		if err != nil {
@@ -190,6 +252,19 @@ func (r *IssuerReconciler) reconcileAuthority(ictx *issuerContext) (ctrl.Result,
 		}
 
 		secret = authority.AuthorityToSecret(&secretName, ca)
+
+		err = ctrl.SetControllerReference(ictx.issuer, secret, r.Scheme)
+		if err != nil {
+			r.Logger.Error(err, "couldn't set controller reference for secret")
+			return ctrl.Result{}, err
+		}
+
+		err = controllerutil.SetOwnerReference(ictx.issuer, secret, r.Scheme)
+		if err != nil {
+			r.Logger.Error(err, "couldn't set controller reference for secret")
+			return ctrl.Result{}, err
+		}
+
 		err = r.Client.Create(ictx.ctx, secret)
 		if err != nil {
 			r.Logger.Error(err, "create secret failed")
@@ -204,30 +279,26 @@ func (r *IssuerReconciler) reconcileAuthority(ictx *issuerContext) (ctrl.Result,
 	}
 }
 
-func (r *IssuerReconciler) buildAuthority(ictx *issuerContext) (*authority.Authority, error) {
-	return nil, nil
-}
-
-func (r *IssuerReconciler) authorityNeedRotate(ictx *issuerContext, ca *authority.Authority) bool {
-
-	if ca == nil || len(ca.CertChain) < 1 {
-		return true
+func (r *IssuerReconciler) buildAuthority(iCtx *issuerContext) (*authority.Authority, error) {
+	cfg := &authority.SpireConfig{
+		TrustDomain:   iCtx.spec.TrustDomain,
+		AgentSocket:   iCtx.spec.AgentSocket,
+		ServerAddress: iCtx.spec.ServerAddress,
 	}
 
-	cert := ca.CertChain[0]
-	notBefore := cert.NotBefore
-	notAfter := cert.NotAfter
-	now := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
 
-	// less than 1/3 TTL
-	if now.After(notBefore.Add((notAfter.Sub(notBefore)) * 2 / 3)) {
-		return true
+	ca, err := authority.GetDownstreamAuthority(ctx, cfg)
+	if err != nil {
+		r.Logger.Error(err, "BuildDownstreamAuthority fail")
+		return nil, err
 	}
 
-	return false
+	return ca, nil
 }
 
-func (r *IssuerReconciler) updateStatus(ictx *issuerContext) {
+func (r *IssuerReconciler) applyStatus(ictx *issuerContext) {
 	issuerInSystem, err := r.newIssuer()
 	if err != nil {
 		r.Logger.Error(err, "Unrecognised issuer type")
@@ -248,7 +319,7 @@ func (r *IssuerReconciler) updateStatus(ictx *issuerContext) {
 		return
 	}
 
-	if !utils.DeepEqual(ictx.issuerStatus, issuerStatusInSystem, true) {
+	if !utils.DeepEqual(ictx.status, issuerStatusInSystem, true) {
 		metaAccessor := meta.NewAccessor()
 		currentResourceVersion, err := metaAccessor.ResourceVersion(issuerInSystem)
 		if err != nil {

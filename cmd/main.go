@@ -36,8 +36,8 @@ import (
 
 	cmapi "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	jubilantv1alpha1 "github.com/kongweiguo/jubilant-controller/api/v1alpha1"
+	"github.com/kongweiguo/jubilant-controller/internal/authority"
 	controllers "github.com/kongweiguo/jubilant-controller/internal/controller"
-	"github.com/kongweiguo/jubilant-controller/internal/signer"
 	"github.com/prometheus/common/version"
 	//+kubebuilder:scaffold:imports
 )
@@ -103,6 +103,9 @@ func main() {
 		"cluster-resource-namespace", clusterResourceNamespace,
 	)
 
+	authority.Init()
+	defer authority.Close()
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
@@ -132,7 +135,6 @@ func main() {
 		Client:                   mgr.GetClient(),
 		Scheme:                   mgr.GetScheme(),
 		ClusterResourceNamespace: clusterResourceNamespace,
-		BuildSigner:              signer.BuildSigner,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Issuer")
 		os.Exit(1)
@@ -142,7 +144,6 @@ func main() {
 		Client:                   mgr.GetClient(),
 		Scheme:                   mgr.GetScheme(),
 		ClusterResourceNamespace: clusterResourceNamespace,
-		BuildSigner:              signer.BuildSigner,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterIssuer")
 		os.Exit(1)

@@ -8,8 +8,11 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: jubilant-controller
   name: issuer-sample
+  namespace: default
 spec:
   # TODO(user): Add fields here
   workMode: "downstream"
-  spireAgentSocket: "unix:///tmp/spire-agent/public/api.sock"
-  spireAddress: "127.0.0.1:8081"
+  secretName: "issuer-sample"
+  trustDomain: "example.com"
+  agentSocket: "/tmp/spire-agent/public/api.sock"
+  spireAddress: "127.0.0.1:18081"

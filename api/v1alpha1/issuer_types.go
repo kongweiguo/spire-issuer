@@ -23,38 +23,13 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// IssuerSpec defines the desired state of Issuer
-type IssuerSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	TrustDomain   string `json:"trustDomain"`  // trustdomain of the issuer,should be same with spire agent and spire server configuration
-	AgentSocket   string `json:"agentSocket"`  // spire agent's unix domain socket path
-	ServerAddress string `json:"spireAddress"` // spire server listen address, looks like: “address:port”
-	SecretName    string `json:"secretName"`
-	//WorkMode           WorkMode `json:"workMode"`         // issuer work mode, could be one ["downstream"|"mint"]
-}
-
-type WorkMode string
-
-const (
-	Downstream WorkMode = "downstream" //
-	Mint       WorkMode = "mint"
-)
-
-// IssuerStatus defines the observed state of Issuer
-type IssuerStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	Conditions []IssuerCondition `json:"conditions,omitempty"`
-
-	// Byte slice containing a PEM encoded signed certificate of the CA
-	Certificate []byte `json:"certificate,omitempty"`
-}
-
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase"
+//+kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+//+kubebuilder:printcolumn:name="NotAfter",type="date",JSONPath=".metadata.notBefore"
+//+kubebuilder:printcolumn:name="NotAfter",type="date",JSONPath=".metadata.notAfter"
+//+kubebuilder:printcolumn:name="CertChain",type="string",JSONPath=".metadata.certChain"
 
 // Issuer is the Schema for the issuers API
 type Issuer struct {
@@ -74,59 +49,42 @@ type IssuerList struct {
 	Items           []Issuer `json:"items"`
 }
 
-// IssuerCondition contains condition information for an Issuer.
-type IssuerCondition struct {
-	// Type of the condition, known values are ('Ready').
-	Type IssuerConditionType `json:"type"`
+// IssuerSpec defines the desired state of Issuer
+type IssuerSpec struct {
+	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
 
-	// Status of the condition, one of ('True', 'False', 'Unknown').
-	Status ConditionStatus `json:"status"`
-
-	// LastTransitionTime is the timestamp corresponding to the last status
-	// change of this condition.
-	// +optional
-	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
-
-	// Reason is a brief machine readable explanation for the condition's last
-	// transition.
-	// +optional
-	Reason string `json:"reason,omitempty"`
-
-	// Message is a human readable description of the details of the last
-	// transition, complementing reason.
-	// +optional
-	Message string `json:"message,omitempty"`
+	TrustDomain   string `json:"trustDomain"`  // trustdomain of the issuer,should be same with spire agent and spire server configuration
+	AgentSocket   string `json:"agentSocket"`  // spire agent's unix domain socket path
+	ServerAddress string `json:"spireAddress"` // spire server listen address, looks like: “address:port”
+	//WorkMode      WorkMode `json:"workMode,omitempty"` // issuer work mode, could be one ["downstream"|"mint"]
 }
 
-// IssuerConditionType represents an Issuer condition value.
-type IssuerConditionType string
+type WorkMode string
 
 const (
-	// IssuerConditionReady represents the fact that a given Issuer condition
-	// is in ready state and able to issue certificates.
-	// If the `status` of this condition is `False`, CertificateRequest controllers
-	// should prevent attempts to sign certificates.
-	IssuerConditionReady IssuerConditionType = "Ready"
+	Downstream WorkMode = "downstream" //
+	Mint       WorkMode = "mint"
 )
 
-// ConditionStatus represents a condition's status.
-// +kubebuilder:validation:Enum=True;False;Unknown
-type ConditionStatus string
+// IssuerStatus defines the observed state of Issuer
+type IssuerStatus struct {
+	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
 
-// These are valid condition statuses. "ConditionTrue" means a resource is in
-// the condition; "ConditionFalse" means a resource is not in the condition;
-// "ConditionUnknown" means kubernetes can't decide if a resource is in the
-// condition or not. In the future, we could add other intermediate
-// conditions, e.g. ConditionDegraded.
+	Phase      Phase              `json:"phase,omitempty"`
+	NotBefore  *metav1.Time       `json:"notBefore,omitempty"`
+	NotAfter   *metav1.Time       `json:"notAfter,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	CertChain  string             `json:"certChain,omitempty"`
+}
+
+type Phase string
+
 const (
-	// ConditionTrue represents the fact that a given condition is true
-	ConditionTrue ConditionStatus = "True"
-
-	// ConditionFalse represents the fact that a given condition is false
-	ConditionFalse ConditionStatus = "False"
-
-	// ConditionUnknown represents the fact that a given condition is unknown
-	ConditionUnknown ConditionStatus = "Unknown"
+	Processing  Phase = "Processing"
+	Running     Phase = "Running"
+	Terminating Phase = "Terminating"
 )
 
 func init() {

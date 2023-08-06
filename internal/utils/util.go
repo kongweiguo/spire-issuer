@@ -18,12 +18,17 @@ package utils
 
 import (
 	"fmt"
+	"math/rand"
+	"os"
 	"reflect"
+	"runtime"
+	"strings"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/kongweiguo/jubilant-controller/api/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -38,46 +43,6 @@ func GetSpecAndStatus(issuer client.Object) (*v1alpha1.IssuerSpec, *v1alpha1.Iss
 	}
 }
 
-func SetReadyCondition(status *v1alpha1.IssuerStatus, conditionStatus v1alpha1.ConditionStatus, reason, message string) {
-	ready := GetReadyCondition(status)
-	if ready == nil {
-		ready = &v1alpha1.IssuerCondition{
-			Type: v1alpha1.IssuerConditionReady,
-		}
-		status.Conditions = append(status.Conditions, *ready)
-	}
-	if ready.Status != conditionStatus {
-		ready.Status = conditionStatus
-		now := metav1.Now()
-		ready.LastTransitionTime = &now
-	}
-	ready.Reason = reason
-	ready.Message = message
-
-	for i, c := range status.Conditions {
-		if c.Type == v1alpha1.IssuerConditionReady {
-			status.Conditions[i] = *ready
-			return
-		}
-	}
-}
-
-func GetReadyCondition(status *v1alpha1.IssuerStatus) *v1alpha1.IssuerCondition {
-	for _, c := range status.Conditions {
-		if c.Type == v1alpha1.IssuerConditionReady {
-			return &c
-		}
-	}
-	return nil
-}
-
-func IsReady(status *v1alpha1.IssuerStatus) bool {
-	if c := GetReadyCondition(status); c != nil {
-		return c.Status == v1alpha1.ConditionTrue
-	}
-	return false
-}
-
 // DeepEqual ...
 func DeepEqual(x, y interface{}, isEquateEmpty bool) bool {
 	if isEquateEmpty {
@@ -86,4 +51,67 @@ func DeepEqual(x, y interface{}, isEquateEmpty bool) bool {
 	}
 
 	return reflect.DeepEqual(x, y)
+}
+
+func NormalizeUnixSocket(socket string) (string, error) {
+	var (
+		socketPath string
+		filePath   string
+	)
+	if strings.HasPrefix(socket, "unix://") {
+		socketPath = socket
+		filePath = strings.TrimPrefix(socket, "unix://")
+	} else {
+		filePath = socket
+		socketPath = "unix://" + socket
+	}
+
+	_, err := os.Stat(filePath)
+	if err != nil {
+		return "", err
+	}
+
+	return socketPath, nil
+}
+
+// GenRandRequeueAfter ...
+func GenRandRequeueAfter(lowBase, topLimit int64) ctrl.Result {
+	return ctrl.Result{
+		RequeueAfter: time.Duration(rand.Int63()%topLimit+lowBase) * time.Second,
+	}
+}
+
+// GenRandRequeueAfter3_8Seconds ...
+func GenRandRequeueAfter3_8Seconds() ctrl.Result {
+	return GenRandRequeueAfter(3, 8)
+}
+
+// LowestNonZeroResult compares two reconciliation results
+// and returns the one with lowest requeue time.
+func LowestNonZeroResult(i, j ctrl.Result) ctrl.Result {
+	switch {
+	case i.IsZero():
+		return j
+	case j.IsZero():
+		return i
+	case i.Requeue:
+		return i
+	case j.Requeue:
+		return j
+	case i.RequeueAfter < j.RequeueAfter:
+		return i
+	default:
+		return j
+	}
+}
+
+func GetCurrentTime() string {
+	return time.Now().Format(time.RFC3339)
+}
+
+// GetFuncName ...return the function pointer ClusterName
+func GetFuncName(f interface{}) string {
+	name := runtime.FuncForPC(reflect.ValueOf(f).Pointer()).Name()
+	list := strings.Split(name, ".")
+	return strings.TrimSuffix(list[len(list)-1], "-fm")
 }

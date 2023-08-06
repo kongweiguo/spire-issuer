@@ -72,6 +72,21 @@ func ParseCertsPEM(pemCerts []byte) ([]*x509.Certificate, error) {
 	return certs, nil
 }
 
+func ParseCertsDER(certsDER [][]byte) ([]*x509.Certificate, error) {
+	var certs []*x509.Certificate
+
+	for _, der := range certsDER {
+		cert, err := x509.ParseCertificate(der)
+		if err != nil {
+			continue
+		}
+
+		certs = append(certs, cert)
+	}
+
+	return certs, nil
+}
+
 func ParseCSRPEM(pemBytes []byte) (*x509.CertificateRequest, error) {
 	// extract PEM from request object
 	block, _ := pem.Decode(pemBytes)

@@ -15,20 +15,3 @@ limitations under the License.
 */
 
 package utils
-
-import (
-	"testing"
-
-	"github.com/kongweiguo/jubilant-controller/api/v1alpha1"
-	"github.com/stretchr/testify/assert"
-)
-
-func TestSetReadyCondition(t *testing.T) {
-	var issuerStatus v1alpha1.IssuerStatus
-
-	SetReadyCondition(&issuerStatus, v1alpha1.ConditionTrue, "reason1", "message1")
-	assert.Equal(t, "message1", GetReadyCondition(&issuerStatus).Message)
-
-	SetReadyCondition(&issuerStatus, v1alpha1.ConditionFalse, "reason2", "message2")
-	assert.Equal(t, "message2", GetReadyCondition(&issuerStatus).Message)
-}
