@@ -21,6 +21,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // func ParsePrivateKeyPEM(pemBytes []byte) (*rsa.PrivateKey, error) {
@@ -50,6 +51,8 @@ func ParseCertPEM(pemBytes []byte) (*x509.Certificate, error) {
 func ParseCertsPEM(pemCerts []byte) ([]*x509.Certificate, error) {
 	var certs []*x509.Certificate
 
+	pemCerts = []byte(strings.TrimSpace(string(pemCerts)))
+
 	for len(pemCerts) > 0 {
 		var block *pem.Block
 		block, pemCerts = pem.Decode(pemCerts)
@@ -67,6 +70,8 @@ func ParseCertsPEM(pemCerts []byte) ([]*x509.Certificate, error) {
 		}
 
 		certs = append(certs, cert)
+
+		pemCerts = []byte(strings.TrimSpace(string(pemCerts)))
 	}
 
 	return certs, nil

@@ -76,6 +76,7 @@ func SecretToAuthority(s *corev1.Secret) (*Authority, error) {
 
 	PrivateKey, err := utils.ParsePrivateKeyPEM(PrivateKeyPEM)
 	if err != nil {
+
 		return nil, err
 	}
 

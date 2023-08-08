@@ -25,6 +25,7 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+	"go.uber.org/zap/zapcore"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -75,7 +76,8 @@ func main() {
 		"Disables waiting for CertificateRequests to have an approved condition before signing.")
 
 	opts := zap.Options{
-		Development: true,
+		Development: false,
+		Level:       zapcore.DebugLevel,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()

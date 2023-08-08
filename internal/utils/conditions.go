@@ -21,6 +21,46 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	ReasonFailedProcess     = "FailedProcess"
+	ReasonWaitingProcess    = "WaitingProcess"
+	ReasonSuccessfulProcess = "SuccessfulProcess"
+	ReasonSkipProcess       = "SkipProcess"
+)
+
+func SetConditionError(status *v1alpha1.IssuerStatus, conditionType string, message string) {
+	nc := metav1.Condition{
+		Type:    conditionType,
+		Status:  metav1.ConditionFalse,
+		Reason:  ReasonFailedProcess,
+		Message: message,
+	}
+
+	SetCondition(status, nc)
+}
+
+func SetConditionWaiting(status *v1alpha1.IssuerStatus, conditionType string, message string) {
+	nc := metav1.Condition{
+		Type:    conditionType,
+		Status:  metav1.ConditionFalse,
+		Reason:  ReasonWaitingProcess,
+		Message: message,
+	}
+
+	SetCondition(status, nc)
+}
+
+func SetConditionSuccess(status *v1alpha1.IssuerStatus, conditionType string) {
+	nc := metav1.Condition{
+		Type:    conditionType,
+		Status:  metav1.ConditionTrue,
+		Reason:  ReasonSuccessfulProcess,
+		Message: "Success",
+	}
+
+	SetCondition(status, nc)
+}
+
 // SetCondition ...
 func SetCondition(status *v1alpha1.IssuerStatus, nc metav1.Condition) {
 	var conditions []metav1.Condition
@@ -58,4 +98,17 @@ func GetCondition(status *v1alpha1.IssuerStatus, conditionType string) (metav1.C
 	}
 
 	return metav1.Condition{}, false
+}
+
+func DeleteCondition(status *v1alpha1.IssuerStatus, conditionType string) {
+	olds := status.Conditions
+
+	for idx := 0; idx < len(olds); idx++ {
+		if olds[idx].Type == conditionType {
+			olds = append(olds[:idx], olds[idx+1:]...)
+			idx--
+		}
+	}
+
+	status.Conditions = olds
 }

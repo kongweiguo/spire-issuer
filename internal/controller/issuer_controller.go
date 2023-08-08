@@ -80,11 +80,11 @@ func (r *IssuerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.handlers = make(map[v1alpha1.Phase][]Reconciler)
 
 	r.handlers[v1alpha1.Processing] = []Reconciler{
-		r.reconcileAuthority,
+		r.ReconcileAuthority,
 	}
 
 	r.handlers[v1alpha1.Running] = []Reconciler{
-		r.reconcileAuthority,
+		r.ReconcileAuthority,
 	}
 
 	r.recorder = mgr.GetEventRecorderFor(v1alpha1.EventSource)
@@ -140,7 +140,9 @@ func (r *IssuerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		status: issuerStatus,
 	}
 
-	return r.reconcile(iCtx)
+	result, _ = r.reconcile(iCtx)
+
+	return result, nil
 }
 
 func (r *IssuerReconciler) reconcile(iCtx *issuerContext) (ctrl.Result, error) {
@@ -172,6 +174,24 @@ func (r *IssuerReconciler) reconcile(iCtx *issuerContext) (ctrl.Result, error) {
 		result = utils.LowestNonZeroResult(result, currentResult)
 	}
 
+	for _, nc := range iCtx.status.Conditions {
+		found := false
+
+		for _, h := range CurrentHandlers {
+			typ := utils.GetFuncName(h)
+			if nc.Type == typ {
+				found = true
+				break
+			}
+		}
+
+		if found {
+			continue
+		} else {
+			utils.DeleteCondition(iCtx.status, nc.Type)
+		}
+	}
+
 	var ready = true
 	for _, h := range CurrentHandlers {
 		typ := utils.GetFuncName(h)
@@ -194,19 +214,31 @@ func (r *IssuerReconciler) reconcile(iCtx *issuerContext) (ctrl.Result, error) {
 	return result, utilerrors.NewAggregate(errorList)
 }
 
-func (r *IssuerReconciler) reconcileAuthority(ictx *issuerContext) (ctrl.Result, error) {
+func (r *IssuerReconciler) ReconcileAuthority(ictx *issuerContext) (ctrl.Result, error) {
+	var err error
+	var ca *authority.Authority
+
+	conditionType := utils.GetFuncName(r.ReconcileAuthority)
+
+	defer func() {
+		if err != nil {
+			utils.SetConditionError(ictx.status, conditionType, err.Error())
+		} else {
+			utils.SetConditionSuccess(ictx.status, conditionType)
+		}
+	}()
+
 	secret := &corev1.Secret{}
 	secretName := types.NamespacedName{Namespace: ictx.req.Namespace, Name: ictx.req.Name}
 	if len(secretName.Namespace) == 0 {
 		secretName.Namespace = r.ClusterResourceNamespace
 	}
 
-	err := r.Client.Get(ictx.ctx, secretName, secret)
+	err = r.Client.Get(ictx.ctx, secretName, secret)
 	if err == nil {
-		// found
 		r.Logger.Info("found secret, trying to check TTL")
 
-		ca, err := authority.SecretToAuthority(secret)
+		ca, err = authority.SecretToAuthority(secret)
 		if err != nil {
 			r.Logger.Error(err, "secret to authority failed")
 			return ctrl.Result{RequeueAfter: defaultHealthCheckInterval}, err
@@ -231,7 +263,7 @@ func (r *IssuerReconciler) reconcileAuthority(ictx *issuerContext) (ctrl.Result,
 
 		err = controllerutil.SetOwnerReference(ictx.issuer, secret, r.Scheme)
 		if err != nil {
-			r.Logger.Error(err, "couldn't set controller reference for secret")
+			r.Logger.Error(err, "couldn't set owner reference for secret")
 			return ctrl.Result{}, err
 		}
 
@@ -246,7 +278,7 @@ func (r *IssuerReconciler) reconcileAuthority(ictx *issuerContext) (ctrl.Result,
 		// not found
 		r.Logger.Info("not found secret")
 
-		ca, err := r.buildAuthority(ictx)
+		ca, err = r.buildAuthority(ictx)
 		if err != nil {
 			return ctrl.Result{RequeueAfter: defaultHealthCheckInterval}, err
 		}
