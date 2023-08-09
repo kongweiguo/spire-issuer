@@ -24,15 +24,6 @@ import (
 	"strings"
 )
 
-// func ParsePrivateKeyPEM(pemBytes []byte) (*rsa.PrivateKey, error) {
-// 	// extract PEM from request object
-// 	block, _ := pem.Decode(pemBytes)
-// 	if block == nil || block.Type != "RSA PRIVATE KEY" {
-// 		return nil, errors.New("PEM block type must be RSA PRIVATE KEY")
-// 	}
-// 	return x509.ParsePKCS1PrivateKey(block.Bytes)
-// }
-
 func ParseCertPEM(pemBytes []byte) (*x509.Certificate, error) {
 	// extract PEM from request object
 	block, _ := pem.Decode(pemBytes)
@@ -57,7 +48,7 @@ func ParseCertsPEM(pemCerts []byte) ([]*x509.Certificate, error) {
 		var block *pem.Block
 		block, pemCerts = pem.Decode(pemCerts)
 		if block == nil {
-			return nil, errors.New("Not PEM file format")
+			return nil, errors.New("decode pem slice fail")
 		}
 		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
 			continue
@@ -93,7 +84,6 @@ func ParseCertsDER(certsDER [][]byte) ([]*x509.Certificate, error) {
 }
 
 func ParseCSRPEM(pemBytes []byte) (*x509.CertificateRequest, error) {
-	// extract PEM from request object
 	block, _ := pem.Decode(pemBytes)
 	if block == nil || block.Type != "CERTIFICATE REQUEST" {
 		return nil, errors.New("PEM block type must be CERTIFICATE REQUEST")
