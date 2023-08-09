@@ -13,7 +13,7 @@ import (
 
 	cfcsr "github.com/cloudflare/cfssl/csr"
 	"github.com/kongweiguo/cryptoutils/encoding"
-	"github.com/kongweiguo/jubilant-controller/internal/utils"
+	"github.com/kongweiguo/spire-broker-controller/internal/utils"
 	"github.com/pkg/errors"
 
 	"github.com/spiffe/go-spiffe/v2/spiffegrpc/grpccredentials"

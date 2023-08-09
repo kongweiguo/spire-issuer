@@ -36,9 +36,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	cmapi "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
-	jubilantv1alpha1 "github.com/kongweiguo/jubilant-controller/api/v1alpha1"
-	"github.com/kongweiguo/jubilant-controller/internal/authority"
-	controllers "github.com/kongweiguo/jubilant-controller/internal/controller"
+	"github.com/kongweiguo/spire-broker-controller/api/v1alpha1"
+	"github.com/kongweiguo/spire-broker-controller/internal/authority"
+	controllers "github.com/kongweiguo/spire-broker-controller/internal/controller"
 	"github.com/prometheus/common/version"
 	//+kubebuilder:scaffold:imports
 )
@@ -53,7 +53,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(cmapi.AddToScheme(scheme))
-	utilruntime.Must(jubilantv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

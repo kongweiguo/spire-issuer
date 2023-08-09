@@ -1,4 +1,4 @@
-module github.com/kongweiguo/jubilant-controller
+module github.com/kongweiguo/spire-broker-controller
 
 go 1.19
 

@@ -17,11 +17,13 @@ rules:
   resources:
   - secrets
   verbs:
+  - create
   - get
   - list
+  - patch
   - watch
 - apiGroups:
-  - jubilant.trustauth.net
+  - spire.trustauth.net
   resources:
   - clusterissuers
   - issuers
@@ -30,7 +32,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - jubilant.trustauth.net
+  - spire.trustauth.net
   resources:
   - clusterissuers/status
   - issuers/status

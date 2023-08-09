@@ -36,9 +36,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/go-logr/logr"
-	"github.com/kongweiguo/jubilant-controller/api/v1alpha1"
-	"github.com/kongweiguo/jubilant-controller/internal/authority"
-	"github.com/kongweiguo/jubilant-controller/internal/utils"
+	"github.com/kongweiguo/spire-broker-controller/api/v1alpha1"
+	"github.com/kongweiguo/spire-broker-controller/internal/authority"
+	"github.com/kongweiguo/spire-broker-controller/internal/utils"
 )
 
 const (
@@ -93,9 +93,9 @@ func (r *IssuerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// +kubebuilder:rbac:groups=jubilant.trustauth.net,resources=issuers;clusterissuers,verbs=get;list;watch
-// +kubebuilder:rbac:groups=jubilant.trustauth.net,resources=issuers/status;clusterissuers/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=spire.trustauth.net,resources=issuers;clusterissuers,verbs=get;list;watch
+// +kubebuilder:rbac:groups=spire.trustauth.net,resources=issuers/status;clusterissuers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;patch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 func (r *IssuerReconciler) newIssuer() (client.Object, error) {

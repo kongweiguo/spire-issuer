@@ -9,7 +9,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/kongweiguo/jubilant-controller/internal/utils"
+	"github.com/kongweiguo/spire-broker-controller/internal/utils"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"

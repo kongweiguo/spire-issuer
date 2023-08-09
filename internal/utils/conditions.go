@@ -17,7 +17,7 @@ limitations under the License.
 package utils
 
 import (
-	"github.com/kongweiguo/jubilant-controller/api/v1alpha1"
+	"github.com/kongweiguo/spire-broker-controller/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

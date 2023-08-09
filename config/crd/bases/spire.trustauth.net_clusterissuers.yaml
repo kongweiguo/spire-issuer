@@ -5,36 +5,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
-  name: issuers.jubilant.trustauth.net
+  name: clusterissuers.spire.trustauth.net
 spec:
-  group: jubilant.trustauth.net
+  group: spire.trustauth.net
   names:
-    kind: Issuer
-    listKind: IssuerList
-    plural: issuers
-    singular: issuer
-  scope: Namespaced
+    kind: ClusterIssuer
+    listKind: ClusterIssuerList
+    plural: clusterissuers
+    singular: clusterissuer
+  scope: Cluster
   versions:
-  - additionalPrinterColumns:
-    - jsonPath: .status.phase
-      name: Phase
-      type: string
-    - jsonPath: .metadata.creationTimestamp
-      name: Age
-      type: date
-    - jsonPath: .metadata.notBefore
-      name: NotAfter
-      type: date
-    - jsonPath: .metadata.notAfter
-      name: NotAfter
-      type: date
-    - jsonPath: .metadata.certChain
-      name: CertChain
-      type: string
-    name: v1alpha1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Issuer is the Schema for the issuers API
+        description: ClusterIssuer is the Schema for the clusterissuers API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation

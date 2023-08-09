@@ -2,8 +2,8 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/jubilant.trustauth.net_issuers.yaml
-- bases/jubilant.trustauth.net_clusterissuers.yaml
+- bases/spire.trustauth.net_issuers.yaml
+- bases/spire.trustauth.net_clusterissuers.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

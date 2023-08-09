@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 const (
-	EventSource                             = "jubilant-controller"
+	EventSource                             = "spire-broker-controller"
 	EventReasonCertificateRequestReconciler = "CertificateRequestReconciler"
 	EventReasonIssuerReconciler             = "IssuerReconciler"
 )
