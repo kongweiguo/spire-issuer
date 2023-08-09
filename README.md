@@ -6,6 +6,7 @@ Also it can handle the the CertificateRequest for cert manager, but only x509 ce
 
 ## Archtecture
 
+![image](https://github.com/kongweiguo/spire-broker-controller/assets/1670845/e01483ea-d960-450f-b0a1-f9c69658f883)
 
 
 ## Getting Started
