@@ -1,8 +1,12 @@
 # spire-broker-controller
-// TODO(user): Add simple overview of use/purpose
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+spire-broker-controller is a intermediate/downstream authority of spire server clusters, can sign the SVID, including x509 and jwt, for pod that has expected Annotations defined in a CR. 
+Also it can handle the the CertificateRequest for cert manager, but only x509 certificate cloud be returned.
+
+## Archtecture
+
+
 
 ## Getting Started
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
