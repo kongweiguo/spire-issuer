@@ -3,9 +3,9 @@
 ## Description
 spire-issuer is a intermediate/downstream authority of spire server. It helps sign the CertificateRequest as a spire downstream ca.
 
-## FLow
+## Overview
 
-![image](https://github.com/kongweiguo/spire-issuer/assets/1670845/241373a3-73c6-4b9b-9654-616a1e3cea2b)
+![image](./docs/pics/overview.drawio.png)
 
 
 ## Getting Started
@@ -96,6 +96,3 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-
-
-kubebuilder create api --group spire.byted.sh --version v1alpha1 --kind Spire

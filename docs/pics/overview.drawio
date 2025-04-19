@@ -1,0 +1,60 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/26.2.2 Chrome/134.0.6998.178 Electron/35.1.2 Safari/537.36" version="26.2.2">
+  <diagram name="第 1 页" id="7IkyZoc8P1nVo2XW1wiS">
+    <mxGraphModel dx="785" dy="554" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="yMuOiInqNPSyR-1Adaf5-3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;curved=0;strokeWidth=1;fontSize=12;fontFamily=JetBrains Mono;" edge="1" parent="1" source="yMuOiInqNPSyR-1Adaf5-1" target="yMuOiInqNPSyR-1Adaf5-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yMuOiInqNPSyR-1Adaf5-1" value="spire agent" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fontFamily=JetBrains Mono;" vertex="1" parent="1">
+          <mxGeometry x="200" y="240" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="yMuOiInqNPSyR-1Adaf5-2" value="spire server" style="whiteSpace=wrap;html=1;rounded=1;fontSize=12;fontFamily=JetBrains Mono;" vertex="1" parent="1">
+          <mxGeometry x="200" y="60" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="yMuOiInqNPSyR-1Adaf5-5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;curved=0;strokeWidth=1;fontSize=12;fontFamily=JetBrains Mono;" edge="1" parent="1" source="yMuOiInqNPSyR-1Adaf5-4" target="yMuOiInqNPSyR-1Adaf5-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yMuOiInqNPSyR-1Adaf5-6" value="&lt;div style=&quot;font-family: &amp;quot;JetBrains Mono&amp;quot;, Menlo, Monaco, &amp;quot;Courier New&amp;quot;, monospace, Menlo, Monaco, &amp;quot;Courier New&amp;quot;, monospace; line-height: 21px; white-space-collapse: preserve;&quot;&gt;1.FetchX509SVID&lt;/div&gt;&lt;div style=&quot;font-family: &amp;quot;JetBrains Mono&amp;quot;, Menlo, Monaco, &amp;quot;Courier New&amp;quot;, monospace, Menlo, Monaco, &amp;quot;Courier New&amp;quot;, monospace; line-height: 21px; white-space-collapse: preserve;&quot;&gt;(for issuer)&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;fontFamily=JetBrains Mono;" vertex="1" connectable="0" parent="yMuOiInqNPSyR-1Adaf5-5">
+          <mxGeometry x="-0.0833" y="1" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="yMuOiInqNPSyR-1Adaf5-7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;curved=0;strokeWidth=1;fontSize=12;fontFamily=JetBrains Mono;" edge="1" parent="1" source="yMuOiInqNPSyR-1Adaf5-4" target="yMuOiInqNPSyR-1Adaf5-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yMuOiInqNPSyR-1Adaf5-8" value="&lt;div style=&quot;font-family: &amp;quot;JetBrains Mono&amp;quot;, Menlo, Monaco, &amp;quot;Courier New&amp;quot;, monospace, Menlo, Monaco, &amp;quot;Courier New&amp;quot;, monospace; line-height: 21px; white-space-collapse: preserve;&quot;&gt;4.MintX509SVID/&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212)); color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;MintJWTSVID&lt;/span&gt;&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;fontFamily=JetBrains Mono;" vertex="1" connectable="0" parent="yMuOiInqNPSyR-1Adaf5-7">
+          <mxGeometry x="0.3384" y="-1" relative="1" as="geometry">
+            <mxPoint x="125" y="81" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="yMuOiInqNPSyR-1Adaf5-10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="yMuOiInqNPSyR-1Adaf5-4" target="yMuOiInqNPSyR-1Adaf5-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yMuOiInqNPSyR-1Adaf5-11" value="3.Reoncile CertificateSignRequest" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontFamily=JetBrains Mono;" vertex="1" connectable="0" parent="yMuOiInqNPSyR-1Adaf5-10">
+          <mxGeometry x="-0.0877" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="yMuOiInqNPSyR-1Adaf5-4" value="spire issuer" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fontFamily=JetBrains Mono;" vertex="1" parent="1">
+          <mxGeometry x="520" y="240" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="yMuOiInqNPSyR-1Adaf5-9" value="API Server" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fontFamily=JetBrains Mono;" vertex="1" parent="1">
+          <mxGeometry x="520" y="400" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="yMuOiInqNPSyR-1Adaf5-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="yMuOiInqNPSyR-1Adaf5-12" target="yMuOiInqNPSyR-1Adaf5-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yMuOiInqNPSyR-1Adaf5-14" value="&lt;span style=&quot;font-family: &amp;quot;JetBrains Mono&amp;quot;;&quot;&gt;2.Reoncile CertificateSignRequest&lt;/span&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="yMuOiInqNPSyR-1Adaf5-13">
+          <mxGeometry x="0.1288" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="yMuOiInqNPSyR-1Adaf5-12" value="cert manager" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fontFamily=JetBrains Mono;" vertex="1" parent="1">
+          <mxGeometry x="520" y="540" width="120" height="60" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
